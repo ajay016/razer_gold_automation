@@ -138,6 +138,7 @@
                             <tr>
                                 <th>S/L</th>
                                 <th>Name</th>
+                                <th>Variant Name</th>
                                 <th>URL</th>
                                 <th>User Account</th>
                                 <th>Region</th>
@@ -150,6 +151,7 @@
                                     <tr data-id="{{ product.id }}">
                                         <td>{{ forloop.counter }}</td>
                                         <td>{{ product.name }}</td>
+                                        <td>{{ product.variant_name }}</td>
                                         <td>{{ product.product_url }}</td>
                                         <td>{{ product.user_account }}</td>
                                         <td>{{ product.region }}</td>
@@ -164,6 +166,7 @@
                                                             data-bs-target="#editModal"
                                                             data-id="{{ product.id }}"
                                                             data-name="{{ product.name }}"
+                                                            data-variant-name="{{ product.variant_name }}"
                                                             data-product-url="{{ product.product_url }}"
                                                             data-account-id="{{ product.user_account.id }}"
                                                             data-region-id="{{ product.region.id }}"
@@ -209,6 +212,13 @@
                                         <div class="mb-3">
                                         <label class="form-label" for="name">Product Name</label><span class="required-fields-mark">*</span>
                                         <input class="form-control btn-pill" id="name" name="name" type="text" placeholder="PUBG Voucher">
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6 col-12">
+                                        <div class="mb-3">
+                                        <label class="form-label" for="name">Variant Name (same as tha name of product in the website)</label><span class="required-fields-mark">*</span>
+                                        <input class="form-control btn-pill" id="variant-name" name="variant_name" type="text" placeholder="PUBG Voucher">
                                         </div>
                                     </div>
 
@@ -350,6 +360,7 @@
     // EDIT: delegate to document in case rows are dynamic
     $(document).on("click", ".edit-icon", function() {
         const name = $(this).data("name");
+        const variantName = $(this).data("variant-name");
         const productUrl = $(this).data("product-url");
         const id = $(this).data("id");
         const accountIid = $(this).data("account-id")
@@ -357,6 +368,7 @@
 
         editId = id;
         $("#name").val(name);
+        $("#variant-name").val(variantName);
         $("#product-url").val(productUrl);
         $("#user-account").val(accountIid).change();
         $("#region").val(regionId).change();

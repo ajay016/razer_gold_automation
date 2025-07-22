@@ -96,9 +96,25 @@
               <ul class="sidebar-submenu">
                   <li><a class="" href="{% url 'product_list' %}">Product List</a></li>
                   <li><a class="" href="{% url 'add_product' %}">Add Product</a></li>
+                  <li><a class="" href="{% url 'add_variants' %}">Add Variants</a></li>
               </ul>
           </li>
           <!--Products-->
+
+          <!--Purchases-->
+          <li class="sidebar-list"><i class="fa-solid fa-thumbtack"></i>
+              <a class="sidebar-link sidebar-title" href="#">
+                  <svg class="stroke-icon">
+                      <use href="{% static 'assets/svg/icon-sprite.svg' %}#stroke-home"></use>
+                  </svg>
+                  <svg class="fill-icon">
+                      <use href="{% static 'assets/svg/icon-sprite.svg' %}#fill-home"></use>
+                  </svg><span class="">Purchases</span></a>
+              <ul class="sidebar-submenu">
+                  <li><a class="" href="{% url 'instant_purchase' %}">Instant Purchase</a></li>
+              </ul>
+          </li>
+          <!--Pruchases-->
 
 
 

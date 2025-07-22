@@ -33,4 +33,25 @@
         padding-left: 15px;
         padding-right: 15px;
     }
+
+    .select2-selection.select2-selection--multiple{
+        border: 1px solid #cccccc !important;
+        border-radius: 60px !important;
+        min-height: 46px;
+        padding: 4px 15px;
+    }
+
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice{
+        border: none;
+        border-radius: 15px;
+        padding: 2px 6px 2px 20px;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove{
+        border-right: none;
+        /* padding: 2px 4px; */
+        top: 1px;
+        left: 2px;
+    }
     /* Select2 style */

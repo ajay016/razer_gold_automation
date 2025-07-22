@@ -106,6 +106,7 @@
                         <thead>
                         <tr>
                             <th>Name</th>
+                            <th>Code</th>
                             <th>URL</th>
                             <th>Action</th>
                         </tr>
@@ -114,6 +115,7 @@
                             {% for region in regions %}
                                 <tr data-id="{{ region.id }}">
                                     <td>{{ region.name }}</td>
+                                    <td>{{ region.code }}</td>
                                     <td>{{ region.url }}</td>
                                     <td> 
                                         <ul class="action"> 
@@ -125,6 +127,7 @@
                                                         data-bs-target="#editModal"
                                                         data-id="{{ region.id }}"
                                                         data-name="{{ region.name }}"
+                                                        data-code="{{ region.code }}"
                                                         data-url="{{ region.url }}"
                                                     ></i>
                                                 </span>
@@ -164,8 +167,17 @@
                                 <div class="row">
                                     <div class="col">
                                         <div class="mb-3">
-                                            <label class="form-label" for="name">Region name</label>
+                                            <label class="form-label" for="name">Region Name</label>
                                             <input class="form-control btn-pill" id="name" name="name" type="text" placeholder="Enter the Region e.g. USA">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="name">Region Code</label>
+                                            <input class="form-control btn-pill" id="code" name="code" type="text" placeholder="Enter the Region Code e.g. bd">
                                         </div>
                                     </div>
                                 </div>
@@ -214,6 +226,15 @@
                                         <div class="mb-3">
                                             <label class="form-label" for="name">Region name</label>
                                             <input class="form-control btn-pill" id="edit-name" name="edit_name" type="text" placeholder="Enter the Region e.g. USA">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="name">Region Code</label>
+                                            <input class="form-control btn-pill" id="edit-code" name="edit_code" type="text" placeholder="Enter the Region Code e.g. bd">
                                         </div>
                                     </div>
                                 </div>
@@ -339,6 +360,7 @@
     $("#addModal form").on("submit", e => {
         e.preventDefault();
         const name = $("#addModal #name").val();
+        const code = $("#addModal #code").val();
         const url  = $("#addModal #url").val();
         fetch("/regions/", {
             method: "POST",
@@ -346,7 +368,7 @@
                 "Content-Type": "application/json",
                 "X-CSRFToken": "{{ csrf_token }}"
             },
-            body: JSON.stringify({ action: "add", name, url })
+            body: JSON.stringify({ action: "add", name, code, url })
         })
         .then(r => r.json())
         .then(d => showMessage(d.status, d.message));
@@ -354,15 +376,17 @@
 
     // EDIT: delegate to document in case rows are dynamic
     $(document).on("click", ".edit-icon", function() {
-        const { id, name, url } = this.dataset;
+        const { id, name, code, url } = this.dataset;
         editId = id;
         $("#edit-name").val(name);
+        $("#edit-code").val(code);
         $("#edit-url").val(url);
     });
 
     $("#editModal form").on("submit", e => {
         e.preventDefault();
         const name = $("#edit-name").val();
+        const code = $("#edit-code").val();
         const url  = $("#edit-url").val();
         fetch("/regions/", {
         method: "POST",
@@ -370,7 +394,7 @@
             "Content-Type": "application/json",
             "X-CSRFToken": "{{ csrf_token }}"
         },
-        body: JSON.stringify({ action: "edit", id: editId, name, url })
+        body: JSON.stringify({ action: "edit", id: editId, name, code, url })
         })
         .then(r => r.json())
         .then(d => showMessage(d.status, d.message));

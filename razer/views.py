@@ -7,13 +7,16 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
+from django.utils.safestring import mark_safe
 from django.contrib.auth import login,logout,authenticate
 from django.http import JsonResponse
 from django_q.tasks import async_task
+import asyncio
 import json
 import re
 from . import tasks
 from .models import *
+from .playwright_client import scrape_variants
 
 
 
@@ -29,25 +32,28 @@ def regions(request):
 
         if action == 'add':
             name = data.get('name')
+            code = data.get('code')
             url = data.get('url')
             
             print('name to add: ', name)
             print('url to add: ', url)
             
-            if not name or not url:
+            if not name or not url or not code:
                 return JsonResponse({'status': 'error', 'message': 'All fields are required.'})
-            Region.objects.create(name=name, url=url)
+            Region.objects.create(name=name, code=code, url=url)
             return JsonResponse({'status': 'success', 'message': 'Region added successfully.'})
 
         elif action == 'edit':
             region_id = data.get('id')
             name = data.get('name')
+            code = data.get('code')
             url = data.get('url')
-            if not region_id or not name or not url:
+            if not region_id or not name or not url or not code:
                 return JsonResponse({'status': 'error', 'message': 'All fields are required.'})
             try:
                 region = Region.objects.get(id=region_id)
                 region.name = name
+                region.code = code
                 region.url = url
                 region.save()
                 return JsonResponse({'status': 'success', 'message': 'Region updated successfully.'})
@@ -69,7 +75,6 @@ def regions(request):
             'regions': regions,
         }
         return render(request, 'regions/regions.html', context)
-
 
 
 def user_accounts(request):
@@ -229,13 +234,17 @@ def product_list(request):
 def add_product(request):
     if request.method == 'POST':
         name = request.POST.get('name')
+        # variant_name = request.POST.get('variant_name')
         product_url = request.POST.get('product_url')
         user_account_id = request.POST.get('user_account')
-        region_id = request.POST.get('region')
+        region_ids = request.POST.getlist('regions[]')
 
         # Validate required fields
         if not name or not product_url:
             return JsonResponse({'success': False, 'status': 'error', 'message': 'All required fields must be filled.'}, status=400)
+        
+        # if not variant_name:
+        #     return JsonResponse({'success': False, 'status': 'error', 'message': 'Variant name is required.'}, status=400)
         
         # Validate product_url format
         url_validator = URLValidator()
@@ -244,44 +253,112 @@ def add_product(request):
         except ValidationError:
             return JsonResponse({'success': False, 'status': 'error', 'message': 'Invalid product URL format.'}, status=400)
         
-        # Validate user account
-        try:
-            user_account = UserAccount.objects.get(id=user_account_id)
-        except UserAccount.DoesNotExist:
-            return JsonResponse({'success': False, 'status': 'error', 'message': 'Selected region is invalid.'}, status=400)
 
-        # Validate region
-        try:
-            region = Region.objects.get(id=region_id)
-        except Region.DoesNotExist:
-            return JsonResponse({'success': False, 'status': 'error', 'message': 'Selected region is invalid.'}, status=400)
+        # Validate regions list
+        # Filter out any non‑integer or invalid IDs
+        # Validate regions
+        # valid_regions = Region.objects.filter(id__in=region_ids)
+        # if not valid_regions.exists():
+        #     return JsonResponse({
+        #         'success': False,
+        #         'status': 'error',
+        #         'message': 'At least one valid region must be selected.'
+        #     }, status=400)
 
         # Save user
         product = Product.objects.create(
             name=name,
+            # variant_name=variant_name,
             product_url=product_url,
-            user_account=user_account,
-            region=region
         )
         
-        return JsonResponse({'success': True, 'status': 'success', 'message': 'User account created successfully.'})
+        # product.regions.set(valid_regions)
+        
+        return JsonResponse({'success': True, 'status': 'success', 'message': 'Product added successfully.'})
 
     # For GET or other methods, render the form page
     user_accounts = UserAccount.objects.all()
     regions = Region.objects.all()
+    # regions = [{'value': r.id, 'name': r.name} for r in Region.objects.all()]
     
     context = {
         'user_accounts': user_accounts,
-        'regions': regions
+        'regions': regions,
+        # 'regions': mark_safe(json.dumps(regions)),
     }
     
     return render(request, 'products/add_product.html', context)
+
+
+def add_variants(request):
+    if request.method == 'POST':
+        pass
+    
+    regions = Region.objects.all()
+    products = Product.objects.all()
+    
+    context = {
+        'regions': regions,
+        'products': products,
+    }
+    
+    return render(request, 'products/add_variants.html', context)
+
+
+def fetch_variants(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method.'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        region_id = data.get('region_id')
+        product_id = data.get('product_id')
+
+        print('received region_id:', region_id)
+        print('received product_id:', product_id)
+
+        if not region_id or not product_id:
+            return JsonResponse({'error': 'Both region and product are required.'}, status=400)
+
+        try:
+            region = Region.objects.get(id=region_id)
+            product = Product.objects.get(id=product_id)
+        except (Region.DoesNotExist, Product.DoesNotExist):
+            return JsonResponse({'error': 'Region or Product not found.'}, status=404)
+
+        # Scrape variants
+        print('Calling async scraper...')
+        variants = asyncio.run(scrape_variants(product.product_url, region.url))
+        
+        if isinstance(variants, dict) and 'error' in variants:
+            return JsonResponse({'error': variants['error']}, status=500)
+
+        saved_variants = []
+
+        for variant_name in variants:
+            variant_obj, created = ProductVariant.objects.get_or_create(
+                product=product,
+                name=variant_name.strip()
+            )
+
+            if not variant_obj.regions.filter(id=region.id).exists():
+                variant_obj.regions.add(region)
+                saved_variants.append(variant_name)
+
+        return JsonResponse({
+            'message': 'Variants processed successfully.',
+            'saved_variants': saved_variants
+        })
+    
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON received.'}, status=400)
 
 
 def edit_product(request):
     if request.method == 'POST':
         product_id = request.POST.get('id')
         name = request.POST.get('name')
+        variant_name = request.POST.get('variant_name')
         product_url = request.POST.get('product_url')
         user_account_id = request.POST.get('user_account')
         region_id = request.POST.get('region')
@@ -318,6 +395,7 @@ def edit_product(request):
 
         # === Update fields ===
         product.name = name
+        product.variant_name = variant_name
         product.product_url = product_url
         product.user_account = user_account
         product.region = region
@@ -346,6 +424,38 @@ def delete_product(request):
         return JsonResponse({'success': True, 'message': 'User account deleted successfully.'})
     
     return JsonResponse({'success': False, 'message': 'Invalid request method.'}, status=405)
+
+
+def instant_purchase(request):
+    user_accounts = UserAccount.objects.all()
+    regions = Region.objects.all()
+    
+    context = {
+        'user_accounts': user_accounts,
+        'regions': regions
+    }
+    
+    return render(request, 'purchases/instant_purchase.html', context)
+
+
+def instant_purchase_execute(request):
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        product_url = request.POST.get('product_url')
+        user_account_id = request.POST.get('user_account')
+        region_id = request.POST.get('region')
+
+        return JsonResponse({
+            'success': True,
+            'status': 'success',
+            'message': f"Received product '{name}' with URL '{product_url}'."
+        })
+
+    return JsonResponse({
+        'success': False,
+        'status': 'error',
+        'message': 'Invalid request method.'
+    }, status=400)
 
 
 

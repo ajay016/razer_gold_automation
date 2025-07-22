@@ -24,6 +24,15 @@ urlpatterns = [
     path('add-product/', views.add_product, name='add_product'),
     path('edit-product/', views.edit_product, name='edit_product'),
     path('delete-product/', views.delete_product, name='delete_product'),
+    
+    # Variants
+    path('add-variants/', views.add_variants, name='add_variants'),
+    path('fetch-variants/', views.fetch_variants, name='fetch_variants'),
+    
+    
+    # purchase products
+    path('instant-purchase/', views.instant_purchase, name='instant_purchase'),
+    path('instant-pruchase-execute/', views.instant_purchase_execute, name='instant_purchase_execute'),
 
 
     

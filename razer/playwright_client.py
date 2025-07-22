@@ -2,6 +2,11 @@ import os
 import shutil
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
+
+
+
+
 
 def login_razer_gold(email: str, password: str, region_url: str, session_dir: str) -> bool:
     print("[*] Starting Razer Gold login process...")
@@ -82,3 +87,45 @@ def login_razer_gold(email: str, password: str, region_url: str, session_dir: st
         finally:
             browser.close()
             print("[*] Browser closed.")
+            
+            
+            
+async def scrape_variants(product_url: str, region_url: str):
+    try:
+        country_code = region_url.split("https://gold.razer.com/")[1].split("/")[0]
+
+        parts = product_url.split('/')
+        parts[3] = country_code
+        target_url = '/'.join(parts)
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=False)
+            context = await browser.new_context()
+            page = await context.new_page()
+            await page.goto(target_url, timeout=60000)
+
+            # First, wait a short time and check for error message
+            try:
+                await page.wait_for_selector('.rz-alert--danger', timeout=2000)
+                alert = await page.query_selector('.rz-alert--danger')
+                if alert:
+                    text = await alert.inner_text()
+                    await browser.close()
+                    return {'error': text.strip()}
+            except:
+                pass  # No error alert found — continue
+
+            # Then try to get variant elements
+            try:
+                await page.wait_for_selector('.selection-tile__text', timeout=10000)
+                elements = await page.query_selector_all('.selection-tile__text')
+                variants = [await el.inner_text() for el in elements]
+                await browser.close()
+                return variants
+            except Exception as e:
+                await browser.close()
+                return {'error': 'No variants found and no error message available.'}
+
+    except Exception as e:
+        return {'error': f'Unexpected error: {str(e)}'}
+

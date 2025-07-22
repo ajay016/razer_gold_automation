@@ -92,40 +92,37 @@
         <div class="col-md-8 col-12">
             <div class="card">
                 <div class="card-header">
-                    <h1>Add a New User Account</h1>
+                    <h1>Add New Variants</h1>
                 </div>
-                <form class="form theme-form dark-inputs" method="POST">
+                <form id="region-product-form" class="form theme-form dark-inputs" method="POST">
                     {% csrf_token %}
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6 col-12">
-                                <div class="mb-3">
-                                    <label class="form-label" for="name">Product Name</label><span class="required-fields-mark">*</span>
-                                    <input class="form-control btn-pill" id="name" name="name" type="text" placeholder="PUBG 60 UC">
-                                </div>
-                            </div>
-                            {% comment %} <div class="col-md-6 col-12">
-                                <div class="mb-3">
-                                    <label class="form-label" for="name">Variant Name (same as tha name of product in the website)</label><span class="required-fields-mark">*</span>
-                                    <input class="form-control btn-pill" id="variant_name" name="variant_name" type="text" placeholder="PUBG 60 UC">
-                                </div>
-                            </div> {% endcomment %}
-
-                            <div class="col-md-6 col-12">
-                                <div class="mb-3">
-                                    <label class="form-label" for="product-url">Product URL</label><span class="required-fields-mark">*</span>
-                                    <input class="form-control btn-pill" id="product-url" name="product_url" type="url" placeholder="https://razergold/pubgvoucher.com">
-                                </div>
-                            </div>
-
-                            {% comment %} <div class="col-md-6 col-12">
-                                <label class="form-label d-block" for="key">Select Regions</label>
-                                <select class="regions-select" name="regions[]" multiple="multiple">
+                                <label class="form-label d-block" for="regions">Select Regions</label>
+                                <select id="regions" class="select2" name="regions">
+                                    <option value="">Select Region</option>
                                     {% for region in regions %}
                                         <option value="{{ region.id }}">{{ region.name }}</option>
                                     {% endfor %}
                                 </select>
-                            </div> {% endcomment %}
+                            </div>
+
+                            <div class="col-md-6 col-12">
+                                <label class="form-label d-block" for="products">Select Product</label>
+                                <select id="products" class="select2" name="products">
+                                    <option value="">Select Product</option>
+                                    {% for product in products %}
+                                        <option value="{{ product.id }}">{{ product.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div>
+                                <button id="fetch-variants-btn" class="btn btn-primary" type="button">Fetch Variants</button>
+                            </div>
                         </div>
                     </div>
 
@@ -159,54 +156,66 @@
 <script>
     function showMessage(type, message) {
         const div = $(".error-success-div");
-        function expand() {
-            div.removeClass("error-message success-message")
-               .addClass(type + "-message")
-               .text(message);
-            requestAnimationFrame(() => div.addClass("show"));
-            if (type === "success") setTimeout(() => location.reload(), 2000);
-        }
+
+        // Set the message and classes
+        div.removeClass("error-message success-message")
+           .addClass(type === "error" ? "error-message" : "success-message")
+           .html(message);
+
+        // Show the div by adding 'show' class
         if (div.hasClass("show")) {
-            div.removeClass("show").one("transitionend", expand);
+            // If already visible, restart the hide timer
+            div.removeClass("show");
+            div.one("transitionend", () => div.addClass("show"));
         } else {
-            expand();
+            div.addClass("show");
         }
+
+        // Hide after 3 seconds
+        setTimeout(() => {
+            div.removeClass("show");
+        }, 3000);
     }
+    
+    $('#fetch-variants-btn').on('click', function () {
+        const regionId = $('#regions').val();
+        const productId = $('#products').val();
+        const csrfToken = $('[name=csrfmiddlewaretoken]').val();
 
-    document.addEventListener("DOMContentLoaded", () => {
-        $('form').on('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            
-            // Clear existing region fields
-            formData.delete('regions');
+        // Basic validation
+        if (!regionId || !productId) {
+            showMessage('error', 'Both Region and Product must be selected.');
+            return;
+        }
 
-            // Append selected regions
-            /*$('.regions-select').val().forEach(val => {
-                formData.append('regions[]', val);
-            });*/
-
-            fetch("{% url 'add_product' %}", {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': '{{ csrf_token }}',
-                },
-                body: formData
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    showMessage(data.status, data.message);
-                    $('form')[0].reset();
-                    $('.regions-select').val(null).trigger('change'); // reset select2
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            })
-            .catch(() => alert('Unexpected error'));
+        fetch('/fetch-variants/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify({
+                region_id: regionId,
+                product_id: productId,
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showMessage('error', data.error);
+            } else {
+                const saved = data.saved_variants && data.saved_variants.length > 0
+                    ? `Variants fetched and saved: ${data.saved_variants.join(', ')}.`
+                    : 'Variants fetched successfully (no new variants saved).';
+                showMessage('success', saved);
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            showMessage('error', 'Something went wrong while fetching variants.');
         });
-    });     
+    });
 </script>
+
 
 {% endblock %}
